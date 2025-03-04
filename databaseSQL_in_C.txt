@@ -1,0 +1,144 @@
+//Programa en C para crear una base de datos con las tablas N:M partida y jugador
+//Incluir esta libreriﾭa para poder hacer las llamadas en shiva2.upc.es
+//#include <my_global.h>
+#include <mysql.h>
+#include <string.h>
+#include <stdlib.h>
+#include <stdio.h>
+int main(int argc, char **argv)
+{
+//Conector para acceder al servidor de bases de datos
+MYSQL *conn;
+int err;
+//Creamos una conexion al servidor MYSQL
+conn = mysql_init(NULL);
+if (conn==NULL) {
+printf ("Error al crear la conexion: %u %s\n",
+mysql_errno(conn), mysql_error(conn));
+exit (1);
+}
+//inicializar la conexion, indicando nuestras claves de acceso
+// al servidor de bases de datos (user,pass)
+conn = mysql_real_connect (conn, "localhost","root", "mysql", NULL, 0, NULL, 0);
+if (conn==NULL)
+{
+printf ("Error al inicializar la conexion: %u %s\n",
+mysql_errno(conn), mysql_error(conn));
+exit (1);
+}
+// ahora vamos a crear la base de datos, que se llamara partidas
+// primero la borramos si es que ya existe (quizas porque hemos
+// hecho pruebas anteriormente
+mysql_query(conn, "drop database if exists partidas;");
+err=mysql_query(conn, "create database partidas;");
+if (err!=0) {
+printf ("Error al crear la base de datos %u %s\n",
+mysql_errno(conn), mysql_error(conn));
+exit (1);
+}
+//indicamos la base de datos con la que queremos trabajar
+err=mysql_query(conn, "use partidas;");
+if (err!=0)
+{
+printf ("Error al crear la base de datos %u %s\n",
+mysql_errno(conn), mysql_error(conn));
+exit (1);
+}
+// creamos la tabla que define la entidad partida:
+// un id, hora, duracion, winner, puntuacion, playersls
+err=mysql_query(conn,
+"CREATE TABLE partida (id INTEGER NOT NULL,
+	hora VARCHAR(6) NOT NULL,
+	duracion VARCHAR(10) NOT NULL,
+	winner INT,
+	puntuacion INTEGER NOT NULL,	
+	playersls VARCHAR(255),
+	PRIMARY KEY(id)
+	FOREIGN KEY (winner) REFERENCES jugador(id)");
+// creamos la tabla que define la entidad jugador:
+// un id, username, password
+err=mysql_query(conn,
+"CREATE TABLE jugador (id INTEGER NOT NULL,
+	username VARCHAR(10),
+	password VARCHAR(10),
+	PRIMARY KEY(id));");
+
+// creamos la tabla que define la entidad match:
+err=mysql_query(conn,
+"CREATE TABLE match (id_j INT,
+	id_p INT,
+	PRIMARY KEY (id_j, id_p),
+	FOREIGN KEY (id_j) REFERENCES jugador(id) ON DELETE CASCADE,
+	FOREIGN KEY (id_p) REFERENCES partida(id) ON DELETE CASCADE);");
+
+// Insertar jugadores
+char consulta[200];
+for (int i = 0; i < 5; i++) {
+    char username[10], password[10];
+
+    printf("Introduce username y password del jugador %d: ", i+1);
+    err = scanf("%s %s", username, password);
+    if (err != 2) {
+        printf("Error al introducir los datos\n");
+        exit(1);
+    }
+
+    sprintf(consulta, "INSERT INTO jugador (username, password) VALUES ('%s', '%s');", username, password);
+    err = mysql_query(conn, consulta);
+    if (err != 0) {
+        printf("Error al insertar jugador %u %s\n", mysql_errno(conn), mysql_error(conn));
+        exit(1);
+    }
+}
+
+// Insertar partidas
+for (int i = 0; i < 5; i++) {
+    int duracion, winner, puntuacion;
+    char hora[20], playersls[255];
+
+    printf("Introduce hora (YYYY-MM-DD HH:MM:SS), duracion, winner (id jugador), puntuacion y playersls (lista de ids separados por ',') para la partida %d: ", i+1);
+    err = scanf("%s %d %d %d %s", hora, &duracion, &winner, &puntuacion, playersls);
+    if (err != 5) {
+        printf("Error al introducir los datos\n");
+        exit(1);
+    }
+
+    sprintf(consulta, "INSERT INTO partida (hora, duracion, winner, puntuacion, playersls) VALUES ('%s', %d, %d, %d, '%s');",
+            hora, duracion, winner, puntuacion, playersls);
+    err = mysql_query(conn, consulta);
+    if (err != 0) {
+        printf("Error al insertar partida %u %s\n", mysql_errno(conn), mysql_error(conn));
+        exit(1);
+    }
+}
+
+// Insertar relaciones en match
+for (int i = 0; i < 5; i++) {
+    int id_j, id_p;
+    
+    printf("Introduce id_jugador e id_partida para match %d: ", i+1);
+    err = scanf("%d %d", &id_j, &id_p);
+    if (err != 2) {
+        printf("Error al introducir los datos\n");
+        exit(1);
+    }
+
+    sprintf(consulta, "INSERT INTO match (id_j, id_p) VALUES (%d, %d);", id_j, id_p);
+    err = mysql_query(conn, consulta);
+    if (err != 0) {
+        printf("Error al insertar match %u %s\n", mysql_errno(conn), mysql_error(conn));
+        exit(1);
+    }
+}
+
+if (err!=0)
+{
+printf ("Error al definir la tabla %u %s\n",
+mysql_errno(conn), mysql_error(conn));
+exit (1);
+}
+// ahora tenemos la base de datos lista en el servidor de MySQL
+// cerrar la conexion con el servidor MYSQL
+mysql_close (conn);
+exit(0);
+}
